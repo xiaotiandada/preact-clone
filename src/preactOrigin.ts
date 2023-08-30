@@ -162,6 +162,8 @@ export class Component {
  *  render(<span>foo</span>, document.body);
  */
 export function h(nodeName, attributes, ...args) {
+  console.log('origin h', nodeName, attributes, args)
+
   let children,
     sharedArr = [],
     len = args.length,

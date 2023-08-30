@@ -1,3 +1,4 @@
+// 空 ｜ 空属性
 const EMPTY = {}
 const NO_RENDER = { render: false }
 const SYNC_RENDER = { renderSync: true }
@@ -6,9 +7,10 @@ const EMPTY_BASE = ''
 // 尺寸相关的属性, 用于判断是否需要加单位
 const NON_DIMENSION_PROPS: { [key: string]: boolean } = {}
 
+// 设置属性名单
 'boxFlex boxFlexGroup columnCount fillOpacity flex flexGrow flexPositive flexShrink flexNegative fontWeight lineClamp lineHeight opacity order orphans strokeOpacity widows zIndex zoom'
   .split(' ')
-  .forEach((k) => (NON_DIMENSION_PROPS[k] = true))
+  .forEach((k: string) => (NON_DIMENSION_PROPS[k] = true))
 
 /** @private */
 let slice = Array.prototype.slice
@@ -48,7 +50,11 @@ let recycler = {
   normalizeName: (name: string) => string
 }
 
-/** @public Render JSX into a `parent` Element. */
+/** @public Render JSX into a `parent` Element.
+ * Component是一个基础组件，类似于React中的组件。
+ * 它有一些生命周期方法，例如shouldComponentUpdate和render，以及一些用于更新组件状态和属性的方法，例如setState和setProps。triggerRender方法将组件标记为脏，并将其排队以进行渲染。
+ * _render方法将组件渲染到DOM中。
+ */
 export function render(component: any, parent: HTMLElement): any {
   console.log('render', component, parent)
 
@@ -62,6 +68,74 @@ export function render(component: any, parent: HTMLElement): any {
   // if (c) hook(c, 'componentDidMount')
 
   return build
+}
+
+/** @public Base Component, with API similar to React. */
+export class Component {
+  props: object
+  state: object
+  constructor() {
+    //
+    /** @type {object} */
+    this.props = hook(this, 'getDefaultProps') || {}
+    /** @type {object} */
+    this.state = hook(this, 'getInitialState') || {}
+
+    hook(this, 'initialize')
+  }
+
+  /** Returns a `boolean` value indicating if the component should re-render when receiving the given `props` and `state`.
+   *	@param {object} props
+   *	@param {object} state
+   */
+  shouldComponentUpdate(props: object, state: object) {
+    return true
+  }
+
+  render(props: object, state: object) {
+    console.log('Component render', props, state)
+    return h('div', { component: this.constructor.name }, props.children)
+  }
+
+  /** @private */
+  _render(opts = EMPTY) {
+    let rendered = this.render({}, {})
+    let base = build(null, rendered || EMPTY_BASE, this)
+  }
+}
+
+/** @public JSX/hyperscript reviver
+ *  h 是一个JSX/hyperscript解析器，用于将JSX转换为虚拟DOM节点。它接受节点名称、属性和子节点作为参数，并返回一个虚拟DOM节点。
+ *	@see http://jasonformat.com/wtf-is-jsx
+ *  @example
+ *  /** @jsx h *\/
+ *  import { render, h } from 'preact';
+ *  render(<span>foo</span>, document.body);
+ */
+export function h(
+  nodeName: string | Component,
+  attributes: { [key: string]: string },
+  ...args: any
+) {
+  console.log('h', nodeName, attributes, args)
+
+  let children
+  let sharedArr = []
+  let len = args.length
+  let arr
+  let lastSimple
+
+  if (len) {
+    children = []
+    for (let i = 0; i < len; i++) {
+      let child = args[i]
+      // if (p === null || p === undefined) continue
+      children.push(child)
+    }
+  }
+
+  let p = new VNode(nodeName, attributes || undefined, children || undefined)
+  return p
 }
 
 function build(dom: any, vnode: VNode, rootComponent?: unknown) {
@@ -170,20 +244,16 @@ function build(dom: any, vnode: VNode, rootComponent?: unknown) {
   return out
 }
 
-export class Component {}
-
-export function h() {}
-
 /** Virtual DOM Node */
 export class VNode {
-  nodeName: string
+  nodeName: string | Component
   attributes: { [key: string]: any } | undefined
   children: VNode[] | undefined
 
   constructor(
-    nodeName: string,
+    nodeName: string | Component,
     attributes: { [key: string]: any },
-    children: VNode[]
+    children: VNode[] | undefined
   ) {
     /** @type {string|class} */
     this.nodeName = nodeName
@@ -196,6 +266,24 @@ export class VNode {
   }
 }
 VNode.prototype.__isVNode = true
+
+/** @private Invoke a "hook" method with arguments if it exists. */
+function hook(obj: any, name: string, ...args: any) {
+  console.log('hook method', obj, name, args)
+
+  let fn = obj[name]
+  if (fn && typeof fn === 'function') return fn.apply(obj, args)
+}
+
+/** @private Fast check if an object is a VNode. */
+function isVNode(obj: VNode) {
+  return obj && obj.__isVNode === true
+}
+
+/** @private Check if a value is `null` or `undefined`. */
+function notEmpty(x: unknown) {
+  return x !== null && x !== undefined
+}
 
 /** @private Get a node's attributes as a hashmap, regardless of type. */
 function getNodeAttributes(node: VNode) {
@@ -226,8 +314,7 @@ function getAccessor(node: HTMLElement, name: string, value: string) {
 function setAccessor(node: HTMLElement, name: string, value: string, old: any) {
   if (name === 'class') {
     node.className = value
-  }
-  if (name === 'style') {
+  } else if (name === 'style') {
     node.style.cssText = value
   } else {
     setComplexAccessor(node, name, value, old)
@@ -240,7 +327,20 @@ function setComplexAccessor(
   value: string,
   old: any
 ) {
-  node.setAttribute(name, value)
+  if (name.substring(0, 2) === 'on') {
+    let type = name.substring(2).toLowerCase()
+    if (type) {
+      node.addEventListener(type, value as any)
+    }
+    return
+  }
+
+  let type = typeof value
+  if (value === null) {
+    node.removeAttribute(name)
+  } else if (type !== 'function' && type !== 'object') {
+    node.setAttribute(name, value)
+  }
 }
 
 export { options, hooks, rerender }

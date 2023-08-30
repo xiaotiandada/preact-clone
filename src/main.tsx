@@ -2,8 +2,10 @@
 // import { render as renderClone } from './index'
 // import { App } from './app.tsx'
 // import './index.css'
-import { render, VNode } from './preact'
+import preact, { render, VNode, Component, h } from './preact'
 // import { render, VNode } from './preactOrigin'
+
+const rootElement = document.getElementById('root')
 
 // console.log('app', <App />)
 
@@ -39,16 +41,41 @@ import { render, VNode } from './preact'
 
 // console.log('app', app)
 
-render(
-  new VNode(
-    'div',
+// render(
+//   new VNode(
+//     'div',
+//     {
+//       style: 'color: red;',
+//       'data-test': 'hello world',
+//       id: 'test',
+//       className: 'test',
+//       onClick: () => {
+//         alert('hello world')
+//       },
+//     },
+//     [new VNode('span', undefined, ['hello world'])]
+//   ),
+//   document.getElementById('root')
+// )
+
+// 定义一个组件
+class HelloWorld extends preact.Component {
+  render() {
+    return preact.h('h1', null, 'Hello, World!')
+  }
+}
+
+// 渲染组件到DOM中
+preact.render(
+  preact.h(
+    'h1',
     {
-      style: 'color: red;',
-      'data-test': 'hello world',
       id: 'test',
       className: 'test',
+      'data-test': 'hello world',
+      style: 'color: red;',
     },
-    [new VNode('span', undefined, ['hello world'])]
+    'Hello, World!'
   ),
-  document.getElementById('root')
+  rootElement!
 )
