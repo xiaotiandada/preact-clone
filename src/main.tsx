@@ -71,11 +71,24 @@ preact.render(
     'h1',
     {
       id: 'test',
-      className: 'test',
+      // className: 'test',
+      className: {
+        a: '1',
+        b: '2',
+        c: false,
+        d: true,
+      },
       'data-test': 'hello world',
-      style: 'color: red;',
+      // style: 'color: red;',
+      style: {
+        color: 'green',
+        backgroundColor: 'gray',
+        fontSize: 20,
+      },
     },
-    'Hello, World!'
+    undefined,
+    null,
+    `Hello, World!`
   ),
   rootElement!
 )
