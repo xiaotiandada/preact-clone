@@ -66,29 +66,35 @@ class HelloWorld extends preact.Component {
 }
 
 // 渲染组件到DOM中
-preact.render(
-  preact.h(
-    'h1',
-    {
-      id: 'test',
-      // className: 'test',
-      className: {
-        a: '1',
-        b: '2',
-        c: false,
-        d: true,
-      },
-      'data-test': 'hello world',
-      // style: 'color: red;',
-      style: {
-        color: 'green',
-        backgroundColor: 'gray',
-        fontSize: 20,
-      },
-    },
-    undefined,
-    null,
-    `Hello, World!`
-  ),
-  rootElement!
-)
+preact.render(preact.h(HelloWorld), rootElement!)
+
+// 渲染组件到DOM中
+// preact.render(
+//   preact.h(
+//     'h1',
+//     {
+//       id: 'test',
+//       // className: 'test',
+//       className: {
+//         a: '1',
+//         b: '2',
+//         c: false,
+//         d: true,
+//       },
+//       'data-test': 'hello world',
+//       // style: 'color: red;',
+//       style: {
+//         color: 'green',
+//         backgroundColor: 'gray',
+//         fontSize: 20,
+//       },
+//       onClick: () => {
+//         console.log('event clicked')
+//       },
+//     },
+//     undefined,
+//     null,
+//     `Hello, World!`
+//   ),
+//   rootElement!
+// )

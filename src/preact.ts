@@ -30,8 +30,11 @@ let options = {
   syncComponentUpdates: true,
 }
 
+type Hooks = {
+  vnode?: ({ attributes }: { attributes: { [key: string]: any } }) => void
+}
 /** @public @object Global hook methods */
-let hooks = {}
+let hooks: Hooks = {}
 
 /** @public Render JSX into a `parent` Element.
  * Component是一个基础组件，类似于React中的组件。
@@ -40,15 +43,13 @@ let hooks = {}
  */
 export function render(component: any, parent: HTMLElement): any {
   console.log('render', component, parent)
-
-  // let built = build(null, component)
   let built = build(null, component)
-  // let c = built._component
+  let c = built?._component
   // 执行生命周期 componentWillMount
-  // if (c) hook(c, 'componentWillMount')
+  if (c) hook(c, 'componentWillMount')
   parent.appendChild(built)
   // 执行生命周期 componentDidMount
-  // if (c) hook(c, 'componentDidMount')
+  if (c) hook(c, 'componentDidMount')
 
   return build
 }
@@ -81,34 +82,23 @@ hooks.vnode = ({ attributes }) => {
   }
 }
 
-let rerender = {}
-
-/** @private DOM node pool, keyed on nodeName. */
-let recycler = {
-  nodes: {},
-  create(nodeName: string) {
-    let name = recycler.normalizeName(nodeName)
-    let list = recycler.nodes[name]
-    return (list && list.pop()) || document.createElement(nodeName)
-  },
-  normalizeName: memoize((name: string) => name.toUpperCase()),
-} as {
-  nodes: { [key: string]: HTMLElement[] }
-  create: (nodeName: string) => HTMLElement
-  normalizeName: (name: string) => string
-}
-
 /** @public Base Component, with API similar to React. */
 export class Component {
+  _dirty: boolean
+  _disableRendering: boolean
+  nextProps: null
+  base: null
   props: object
   state: object
   constructor() {
-    //
+    /** @private */
+    this._dirty = this._disableRendering = false
+    /** @public */
+    this.nextProps = this.base = null
     /** @type {object} */
     this.props = hook(this, 'getDefaultProps') || {}
     /** @type {object} */
     this.state = hook(this, 'getInitialState') || {}
-
     hook(this, 'initialize')
   }
 
@@ -125,10 +115,51 @@ export class Component {
     return h('div', { component: this.constructor.name }, props.children)
   }
 
+  // 这段代码定义了一个名为_render的方法，它用于渲染组件并更新DOM。
+  // 这个方法是Preact中组件更新的核心方法，它会在组件状态或属性发生变化时被调用，用于重新渲染组件并更新DOM。
   /** @private */
   _render(opts = EMPTY) {
-    let rendered = this.render({}, {})
-    let base = build(null, rendered || EMPTY_BASE, this)
+    // 检查this._disableRendering属性是否为true，如果是，则直接返回。
+    if (this._disableRendering === true) return
+
+    // 否则，它将this._dirty属性设置为false，表示组件已经渲染完成。
+    this._dirty = false
+
+    // 检查this.base属性是否存在，并且调用hook(this, 'shouldComponentUpdate', this.props, this.state)方法来判断组件是否需要更新。
+    if (
+      this.base &&
+      hook(this, 'shouldComponentUpdate', this.props, this.state) === false
+    ) {
+      // 如果不需要更新，则将this.props属性设置为this.nextProps属性，并直接返回。
+      this.props = this.nextProps
+      return
+    }
+
+    // 如果需要更新，则将this.props属性设置为this.nextProps属性，
+    this.props = this.nextProps
+
+    // 生命周期
+    // 并调用hook(this, 'componentWillUpdate')方法。
+    hook(this, 'componentWillUpdate')
+
+    // 调用hook(this, 'render', this.props, this.state)方法来获取组件的虚拟DOM树。
+    let rendered = hook(this, 'render', this.props, this.state)
+
+    // 检查this.base属性是否存在或者opts.build属性是否为true
+    if (this.base || (opts as typeof DOM_RENDER).build === true) {
+      // 调用build方法来创建DOM节点，并将其添加到父节点中
+      let base = build(this.base, rendered || EMPTY_BASE, this)
+      // 如果this.base属性存在，并且新创建的DOM节点与旧的DOM节点不同，则将新的DOM节点替换旧的DOM节点。
+      if (this.base && base !== this.base) {
+        let p = this.base.parentNode
+        if (p) p.replaceChild(base, this.base)
+      }
+      this.base = base
+    }
+
+    // 生命周期
+    // 调用hook(this, 'componentDidUpdate')方法来通知组件已经更新完成。
+    hook(this, 'componentDidUpdate')
   }
 }
 
@@ -225,12 +256,46 @@ export function h(
   return p
 }
 
+/** @private Apply the component referenced by a VNode to the DOM. */
+function buildComponentFromVNode(dom: any, vnode: VNode) {
+  console.log('Building Component', dom, vnode)
+  let c = dom && dom._component
+  if (c) {
+    // ...
+  } else {
+    if (c) {
+      // ...
+    }
+    return createComponentFromVNode(vnode)
+  }
+}
+/** @private Instantiate and render a Component, given a VNode whose nodeName is a constructor. */
+function createComponentFromVNode(vnode: VNode) {
+  let component = componentRecycler.create(vnode.nodeName)
+  console.log('component', component)
+
+  let props = {}
+  component.setProps(props, NO_RENDER)
+  component._render(DOM_RENDER)
+
+  let node = component.base
+  node._component = component
+  node._componentConstructor = vnode.nodeName
+
+  return node
+}
+
+/** @private Apply differences in a given vnode (and it's deep children) to a real DOM Node. */
 function build(dom: any, vnode: VNode, rootComponent?: unknown) {
   //
   console.log('build', dom, dom?.nodeName, vnode, rootComponent)
 
   let out = dom
-  let nodeName: string = vnode.nodeName
+  let nodeName: string | Component = vnode.nodeName
+
+  if (typeof nodeName === 'function') {
+    return buildComponentFromVNode(dom, vnode)
+  }
 
   // 创建文本节点
   if (typeof vnode === 'string') {
@@ -354,6 +419,69 @@ export class VNode {
 }
 VNode.prototype.__isVNode = true
 
+/** @private Managed re-rendering queue for dirty components. */
+let renderQueue = {
+  items: [],
+  itemsOffline: [],
+  pending: false,
+  add(component) {
+    //
+  },
+  process() {
+    //
+  },
+}
+
+/** @private @function Trigger all pending render() calls. */
+let rerender = renderQueue.process
+
+/** @private DOM node pool, keyed on nodeName. */
+let recycler = {
+  nodes: {},
+  create(nodeName: string) {
+    let name = recycler.normalizeName(nodeName)
+    let list = recycler.nodes[name]
+    return (list && list.pop()) || document.createElement(nodeName)
+  },
+  normalizeName: memoize((name: string) => name.toUpperCase()),
+} as {
+  nodes: { [key: string]: HTMLElement[] }
+  create: (nodeName: string) => HTMLElement
+  normalizeName: (name: string) => string
+}
+
+/**
+ * 这段代码定义了一个名为componentRecycler的对象，它用于缓存和重用组件实例。
+ * 具体来说，它维护了一个以组件名称为键的对象，每个键对应一个组件实例列表。当需要创建一个新的组件实例时，它会首先检查该组件名称对应的实例列表是否存在，如果存在，则从列表中取出一个实例并返回。否则，它将创建一个新的组件实例并返回。
+ * 
+ * 例如，如果我们有以下组件定义：
+  class MyComponent extends Component {
+  // ...
+  }
+ * 那么在创建一个新的MyComponent实例时，可以使用componentRecycler.create(MyComponent)方法。如果之前已经创建过一个MyComponent实例并将其添加到缓存中，则可以使用componentRecycler.create(MyComponent)方法从缓存中取出该实例并返回。这样可以避免重复创建实例，提高性能。
+ */
+/** @private Retains a pool of Components for re-use, keyed on component name. */
+let componentRecycler = {
+  components: {},
+  // collect方法用于将一个组件实例添加到缓存中。它接受一个组件实例作为参数，并根据该实例的构造函数名称将其添加到对应的实例列表中。如果该列表不存在，则会创建一个新的列表。
+  collect(component: Component) {
+    let name = component.constructor.name
+    let list =
+      componentRecycler.components[name] ||
+      (componentRecycler.components[name] = [])
+    list.push(component)
+  },
+  // create方法用于创建一个新的组件实例。它接受一个组件构造函数作为参数，并根据该构造函数的名称从对应的实例列表中取出一个实例。如果该列表不存在或为空，则会创建一个新的组件实例并返回。
+  create(ctor) {
+    let name = ctor.name
+    let list = componentRecycler.components[name]
+    if (list && list.length) {
+      return list.splice(0, 1)[0]
+    }
+    return new ctor()
+  },
+}
+
 /** @private Invoke a "hook" method with arguments if it exists. */
 function hook(obj: any, name: string, ...args: any) {
   console.log('hook method', obj, name, args)
@@ -377,14 +505,22 @@ function getNodeAttributes(node: VNode) {
   console.log('getNodeAttributes list', node)
 
   let list = node.attributes
+  /**
+   * list.getNamedItem是一个DOM API，用于获取指定名称的属性节点。在这段代码中，它被用于检查node.attributes对象是否包含getNamedItem方法，以确定该对象是否是一个有效的属性列表。
+   * 具体来说，node.attributes是一个NamedNodeMap对象，它表示一个元素节点的所有属性节点。getNamedItem方法接受一个属性名称作为参数，并返回该属性的节点对象。如果该属性不存在，则返回null。
+   */
   if (!list || !list.getNamedItem) return list
-  if (list.length) return getAttributesAsObject(list)
+  if (list.length) return getAttributesAsObject(list as NamedNodeMap)
 }
 
 /** @private Convert a DOM `.attributes` NamedNodeMap to a hashmap. */
-function getAttributesAsObject(list: { [key: string]: string }) {
+function getAttributesAsObject(list: NamedNodeMap): { [key: string]: string } {
   console.log('getAttributesAsObject list', list)
   let attrs: { [key: string]: string } = {}
+  for (let i = list.length; i--; ) {
+    let item = list[i]
+    attrs[item.name] = item.value
+  }
   return attrs
 }
 
@@ -416,9 +552,10 @@ function setComplexAccessor(
 ) {
   if (name.substring(0, 2) === 'on') {
     let type = name.substring(2).toLowerCase()
-    if (type) {
-      node.addEventListener(type, value as any)
-    }
+    let l = node._listeners || (node._listeners = {})
+
+    if (!l[type]) node.addEventListener(type, eventProxy)
+    l[type] = value
     return
   }
 
@@ -429,6 +566,16 @@ function setComplexAccessor(
     node.setAttribute(name, value)
   }
 }
+
+function eventProxy(e: Event) {
+  console.log('eventProxy', e, this, this._listeners)
+  let l = this._listeners
+  let fn = l[normalizeEventType(e.type)]
+  if (fn) return fn.call(this, hook(hooks, 'event', e) || e)
+}
+
+/** @private @function Normalize an event type/name to lowercase */
+let normalizeEventType = memoize((type: string) => type.toLowerCase())
 
 /** @private Convert a hashmap of styles to CSSText */
 function styleObjToCss(s: { [key: string]: any }): string {
