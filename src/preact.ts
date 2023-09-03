@@ -110,6 +110,43 @@ export class Component {
     return true
   }
 
+  /** Update component state by copying values from `state` to `this.state`.
+   *	@param {object} state
+   */
+  setState(state: Record<string, any>) {
+    extend(this.state, state)
+    this.triggerRender()
+  }
+
+  /** Set `props` for the component.
+   * 设置组件的 props 属性
+   *	@param {object} props props 是一个对象，表示要设置的新的 props 值
+   *	@param {object} [opts] opts 是一个可选的对象，表示一些选项，包括 renderSync 和 render。
+   *	@param {object} [opts.renderSync] - If `true` and {@link options.syncComponentUpdates} is `true`, triggers synchronous rendering.
+   *	@param {object} [opts.render=true] - If `false`, no render will be triggered.
+   */
+  setProps(props: Record<string, any>, opts = EMPTY) {
+    let d = this._disableRendering === true
+    this._disableRendering = true
+    hook(this, 'componentWillReceiveProps', props, this.props)
+    this.nextProps = props
+    this._disableRendering = d
+    // 如果 renderSync 为 true，并且全局配置 options.syncComponentUpdates 也为 true，则会触发同步渲染；如果 render 为 false，则不会触发渲染。
+    if (opts.renderSync === true && options.syncComponentUpdates === true) {
+      this._render()
+    } else if (opts.render !== false) {
+      this.triggerRender()
+    }
+  }
+
+  /** Mark component as dirty and queue up a render. */
+  triggerRender() {
+    if (this._dirty !== true) {
+      this._dirty = true
+      renderQueue.add(this)
+    }
+  }
+
   render(props: object, state: object) {
     console.log('Component render', props, state)
     return h('div', { component: this.constructor.name }, props.children)
@@ -256,146 +293,6 @@ export function h(
   return p
 }
 
-/** @private Apply the component referenced by a VNode to the DOM. */
-function buildComponentFromVNode(dom: any, vnode: VNode) {
-  console.log('Building Component', dom, vnode)
-  let c = dom && dom._component
-  if (c) {
-    // ...
-  } else {
-    if (c) {
-      // ...
-    }
-    return createComponentFromVNode(vnode)
-  }
-}
-/** @private Instantiate and render a Component, given a VNode whose nodeName is a constructor. */
-function createComponentFromVNode(vnode: VNode) {
-  let component = componentRecycler.create(vnode.nodeName)
-  console.log('component', component)
-
-  let props = {}
-  component.setProps(props, NO_RENDER)
-  component._render(DOM_RENDER)
-
-  let node = component.base
-  node._component = component
-  node._componentConstructor = vnode.nodeName
-
-  return node
-}
-
-/** @private Apply differences in a given vnode (and it's deep children) to a real DOM Node. */
-function build(dom: any, vnode: VNode, rootComponent?: unknown) {
-  //
-  console.log('build', dom, dom?.nodeName, vnode, rootComponent)
-
-  let out = dom
-  let nodeName: string | Component = vnode.nodeName
-
-  if (typeof nodeName === 'function') {
-    return buildComponentFromVNode(dom, vnode)
-  }
-
-  // 创建文本节点
-  if (typeof vnode === 'string') {
-    return document.createTextNode(vnode)
-  }
-
-  // 创建为定义的元素
-  if (nodeName === null || nodeName === undefined) {
-    console.log('x-undefined-element', nodeName)
-
-    nodeName = 'x-undefined-element'
-  }
-
-  console.log('dom', dom)
-
-  // 没有 dom 节点，创建一个新的节点
-  if (!dom) {
-    console.log('nodeName', nodeName)
-    out = recycler.create(nodeName)
-
-    console.log('out', out)
-  } else if (false) {
-    //
-  } else {
-    //
-  }
-
-  // apply attributes
-  let old: { [key: string]: any } = getNodeAttributes(out) || EMPTY
-  let attrs: { [key: string]: any } = vnode.attributes || EMPTY
-
-  console.log('xxx', old, attrs)
-
-  // new & updated attributes
-  if (attrs !== EMPTY) {
-    for (let name in attrs) {
-      if (attrs.hasOwnProperty(name)) {
-        let value = attrs[name]
-        if (value !== undefined && value !== null && value !== false) {
-          let prev = getAccessor(out, name, old[name])
-          if (value !== prev) {
-            setAccessor(out, name, value, old[name])
-          }
-        }
-      }
-    }
-  }
-
-  // 循环处理子节点
-  let newChildren = []
-  if (vnode.children) {
-    for (let i = 0, vlen = vnode.children.length; i < vlen; i++) {
-      let vchild = vnode.children[i]
-      let attrs = vchild.attributes
-      let key
-      let child
-      if (attrs) {
-        //
-      }
-
-      /**
-       * 这段代码的作用是尝试从现有的子节点中获取与当前虚拟节点相同类型的节点。
-       * 如果找到了相同类型的节点，则将其从现有的子节点中删除并返回该节点。如果没有找到相同类型的节点，则返回 undefined。
-       */
-
-      // attempt to pluck a node of the same type from the existing children
-      if (!child) {
-        //
-      }
-
-      // 循环处理子节点
-      // morph the matched/found/created DOM child to match vchild (deep)
-      newChildren.push(build(null, vchild))
-    }
-  }
-
-  // 循环处理子节点
-  // apply the constructed/enhanced ordered list to the parent
-  for (let i = 0, len = newChildren.length; i < len; i++) {
-    // we're intentionally re-referencing out.childNodes here as it is a live array (akin to live NodeList)
-    if (out.childNodes[i] !== newChildren[i]) {
-      let child = newChildren[i]
-      // let c = child._component
-      let next = out.childNodes[i + 1]
-
-      // 有下一个节点，插入到下一个节点之前
-      if (next) {
-        out.insertBefore(child, next)
-      } else {
-        // 插入到最后
-        out.appendChild(child)
-      }
-    }
-  }
-
-  console.log('out childNodes', out.childNodes)
-
-  return out
-}
-
 /** Virtual DOM Node */
 export class VNode {
   nodeName: string | Component
@@ -419,16 +316,255 @@ export class VNode {
 }
 VNode.prototype.__isVNode = true
 
+/** @private Invoke a "hook" method with arguments if it exists. */
+function hook(obj: any, name: string, ...args: any) {
+  console.log('hook method', obj, name, args)
+
+  let fn = obj[name]
+  if (fn && typeof fn === 'function') return fn.apply(obj, args)
+}
+
+/** @private Fast check if an object is a VNode. */
+function isVNode(obj: VNode) {
+  return obj && obj.__isVNode === true
+}
+
+/** @private Check if a value is `null` or `undefined`. */
+function notEmpty(x: unknown) {
+  return x !== null && x !== undefined
+}
+
+/** @private Check if two nodes are equivalent. */
+function isSameNodeType(node, vnode) {
+  if (node.nodeType === 3) {
+    return typeof vnode === 'string'
+  }
+  let nodeName = vnode.nodeName
+  if (typeof nodeName === 'function')
+    return node._componentConstructor === nodeName
+  return node.nodeName.toLowerCase() === nodeName
+}
+
+/**
+ * buildComponentFromVNode 是 preact 中的一个函数，用于根据 VNode 对象构建组件。
+ * 它接受两个参数：dom 和 vnode。其中，dom 表示要构建的组件的 DOM 元素；vnode 表示要构建的组件的 VNode 对象。
+ */
+/** @private Apply the component referenced by a VNode to the DOM. */
+function buildComponentFromVNode(dom: any, vnode: VNode) {
+  let c = dom && dom._component
+
+  // 如果 dom 已经存在，并且它的 _componentConstructor 属性等于 vnode.nodeName，则说明这个 DOM 元素已经是一个组件的实例，此时会调用 setProps 方法更新组件的 props 属性，并返回这个 DOM 元素。
+  if (c && dom._componentConstructor === vnode.nodeName) {
+    let props = getNodeProps(vnode)
+    c.setProps(props, SYNC_RENDER)
+    return dom
+  } else {
+    // 会先卸载这个 DOM 元素上的组件
+    if (c) unmountComponent(dom, c)
+    // 然后调用 createComponentFromVNode 方法创建一个新的组件实例，并返回这个组件实例的 base 属性。
+    return createComponentFromVNode(vnode)
+  }
+}
+
+/** @private Instantiate and render a Component, given a VNode whose nodeName is a constructor. */
+function createComponentFromVNode(vnode: VNode) {
+  let component = componentRecycler.create(vnode.nodeName)
+  console.log('component', component)
+
+  let props = {}
+  component.setProps(props, NO_RENDER)
+  component._render(DOM_RENDER)
+
+  let node = component.base
+  node._component = component
+  node._componentConstructor = vnode.nodeName
+
+  return node
+}
+
+/** @private Remove a component from the DOM and recycle it. */
+function unmountComponent(dom: any, component: Component) {
+  console.warn('unmounting mismatched component', component)
+
+  delete dom._component
+  hook(component, 'componentWillUnmount')
+  let base = component.base
+  if (base && base.parentNode) {
+    base.parentNode.removeChild(base)
+  }
+  hook(component, 'componentDidUnmount')
+  componentRecycler.collect(component)
+}
+
+/** @private Apply differences in a given vnode (and it's deep children) to a real DOM Node. */
+function build(dom, vnode, rootComponent) {
+  let out = dom,
+    nodeName = vnode.nodeName
+
+  if (typeof nodeName === 'function') {
+    return buildComponentFromVNode(dom, vnode)
+  }
+
+  if (typeof vnode === 'string') {
+    if (dom) {
+      if (dom.nodeType === 3) {
+        dom.textContent = vnode
+        return dom
+      } else {
+        if (dom.nodeType === 1) recycler.collect(dom)
+      }
+    }
+    return document.createTextNode(vnode)
+  }
+
+  if (nodeName === null || nodeName === undefined) {
+    nodeName = 'x-undefined-element'
+  }
+
+  if (!dom) {
+    out = recycler.create(nodeName)
+  } else if (dom.nodeName.toLowerCase() !== nodeName) {
+    out = recycler.create(nodeName)
+    appendChildren(out, slice.call(dom.childNodes))
+    // reclaim element nodes
+    if (dom.nodeType === 1) recycler.collect(dom)
+  } else if (dom._component && dom._component !== rootComponent) {
+    unmountComponent(dom, dom._component)
+  }
+
+  // apply attributes
+  let old = getNodeAttributes(out) || EMPTY,
+    attrs = vnode.attributes || EMPTY
+
+  // removed attributes
+  if (old !== EMPTY) {
+    for (let name in old) {
+      if (old.hasOwnProperty(name)) {
+        let o = attrs[name]
+        if (o === undefined || o === null || o === false) {
+          setAccessor(out, name, null, old[name])
+        }
+      }
+    }
+  }
+
+  // new & updated attributes
+  if (attrs !== EMPTY) {
+    for (let name in attrs) {
+      if (attrs.hasOwnProperty(name)) {
+        let value = attrs[name]
+        if (value !== undefined && value !== null && value !== false) {
+          let prev = getAccessor(out, name, old[name])
+          if (value !== prev) {
+            setAccessor(out, name, value, prev)
+          }
+        }
+      }
+    }
+  }
+
+  let children = slice.call(out.childNodes)
+  let keyed = {}
+  for (let i = children.length; i--; ) {
+    let t = children[i].nodeType
+    let key
+    if (t === 3) {
+      key = t.key
+    } else if (t === 1) {
+      key = children[i].getAttribute('key')
+    } else {
+      continue
+    }
+    if (key) keyed[key] = children.splice(i, 1)[0]
+  }
+  let newChildren = []
+
+  if (vnode.children) {
+    for (let i = 0, vlen = vnode.children.length; i < vlen; i++) {
+      let vchild = vnode.children[i]
+      let attrs = vchild.attributes
+      let key, child
+      if (attrs) {
+        key = attrs.key
+        child = key && keyed[key]
+      }
+
+      // attempt to pluck a node of the same type from the existing children
+      if (!child) {
+        let len = children.length
+        if (children.length) {
+          for (let j = 0; j < len; j++) {
+            if (isSameNodeType(children[j], vchild)) {
+              child = children.splice(j, 1)[0]
+              break
+            }
+          }
+        }
+      }
+
+      // morph the matched/found/created DOM child to match vchild (deep)
+      newChildren.push(build(child, vchild))
+    }
+  }
+
+  // apply the constructed/enhanced ordered list to the parent
+  for (let i = 0, len = newChildren.length; i < len; i++) {
+    // we're intentionally re-referencing out.childNodes here as it is a live array (akin to live NodeList)
+    if (out.childNodes[i] !== newChildren[i]) {
+      let child = newChildren[i],
+        c = child._component,
+        next = out.childNodes[i + 1]
+      if (c) hook(c, 'componentWillMount')
+      if (next) {
+        out.insertBefore(child, next)
+      } else {
+        out.appendChild(child)
+      }
+      if (c) hook(c, 'componentDidMount')
+    }
+  }
+
+  // remove orphaned children
+  for (let i = 0, len = children.length; i < len; i++) {
+    let child = children[i],
+      c = child._component
+    if (c) hook(c, 'componentWillUnmount')
+    child.parentNode.removeChild(child)
+    if (c) {
+      hook(c, 'componentDidUnmount')
+      componentRecycler.collect(c)
+    } else if (child.nodeType === 1) {
+      recycler.collect(child)
+    }
+  }
+
+  return out
+}
+
 /** @private Managed re-rendering queue for dirty components. */
 let renderQueue = {
   items: [],
   itemsOffline: [],
   pending: false,
   add(component) {
-    //
+    if (renderQueue.items.push(component) !== 1) return
+
+    let d = hooks.debounceRendering
+    if (d) d(renderQueue.process)
+    else setTimeout(renderQueue.process, 0)
   },
   process() {
-    //
+    let items = renderQueue.items,
+      len = items.length
+    if (!len) return
+    renderQueue.items = renderQueue.itemsOffline
+    renderQueue.items.length = 0
+    renderQueue.itemsOffline = items
+    while (len--) {
+      if (items[len]._dirty) {
+        items[len]._render()
+      }
+    }
   },
 }
 
@@ -438,10 +574,30 @@ let rerender = renderQueue.process
 /** @private DOM node pool, keyed on nodeName. */
 let recycler = {
   nodes: {},
+  collect(node: VNode) {
+    recycler.clean(node)
+    let name = recycler.normalizeName(node.nodeName),
+      list = recycler.nodes[name]
+    if (list) list.push(node)
+    else recycler.nodes[name] = [node]
+  },
   create(nodeName: string) {
     let name = recycler.normalizeName(nodeName)
     let list = recycler.nodes[name]
     return (list && list.pop()) || document.createElement(nodeName)
+  },
+  clean(node: HTMLElement) {
+    node.remove()
+    let len = node.attributes && node.attributes.length
+    if (len)
+      for (let i = len; i--; ) {
+        node.removeAttribute(node.attributes[i].name)
+      }
+
+    // if (node.childNodes.length>0) {
+    // 	console.warn(`Warning: Recycler collecting <${node.nodeName}> with ${node.childNodes.length} children.`);
+    // 	slice.call(node.childNodes).forEach(recycler.collect);
+    // }
   },
   normalizeName: memoize((name: string) => name.toUpperCase()),
 } as {
@@ -482,23 +638,77 @@ let componentRecycler = {
   },
 }
 
-/** @private Invoke a "hook" method with arguments if it exists. */
-function hook(obj: any, name: string, ...args: any) {
-  console.log('hook method', obj, name, args)
+/** @private Append children to a Node.
+ *	Uses a Document Fragment to batch when appending 2 or more children
+ */
+function appendChildren(parent, children) {
+  let len = children.length
+  if (len <= 2) {
+    parent.appendChild(children[0])
+    if (len === 2) parent.appendChild(children[1])
+    return
+  }
 
-  let fn = obj[name]
-  if (fn && typeof fn === 'function') return fn.apply(obj, args)
+  let frag = document.createDocumentFragment()
+  for (let i = 0; i < len; i++) frag.appendChild(children[i])
+  parent.appendChild(frag)
 }
 
-/** @private Fast check if an object is a VNode. */
-function isVNode(obj: VNode) {
-  return obj && obj.__isVNode === true
+/** @private Get the value of a rendered attribute */
+function getAccessor(node: HTMLElement, name: string, value: string) {
+  if (name === 'class') return node.className
+  if (name === 'style') return node.style.cssText
+  return value
 }
 
-/** @private Check if a value is `null` or `undefined`. */
-function notEmpty(x: unknown) {
-  return x !== null && x !== undefined
+/** @private Set a named attribute on the given Node, with special behavior for some names and event handlers.
+ *	If `value` is `null`, the attribute/handler will be removed.
+ */
+function setAccessor(node: HTMLElement, name: string, value: string, old: any) {
+  if (name === 'class') {
+    node.className = value
+  } else if (name === 'style') {
+    node.style.cssText = value
+  } else {
+    setComplexAccessor(node, name, value, old)
+  }
 }
+
+/** @private For props without explicit behavior, apply to a Node as event handlers or attributes. */
+function setComplexAccessor(
+  node: HTMLElement,
+  name: string,
+  value: string,
+  old: any
+) {
+  if (name.substring(0, 2) === 'on') {
+    let type = name.substring(2).toLowerCase()
+    // 节点设置 _listeners 存储 type: value
+    let l = node._listeners || (node._listeners = {})
+
+    if (!l[type]) node.addEventListener(type, eventProxy)
+    l[type] = value
+    return
+  }
+
+  let type = typeof value
+  if (value === null) {
+    node.removeAttribute(name)
+  } else if (type !== 'function' && type !== 'object') {
+    node.setAttribute(name, value)
+  }
+}
+
+function eventProxy(e: Event) {
+  console.log('eventProxy', e, this, this._listeners)
+  // 通过类型读取节点存储的 _listeners
+  let l = this._listeners
+  let fn = l[normalizeEventType(e.type)]
+  if (fn) return fn.call(this, hook(hooks, 'event', e) || e)
+}
+
+/** @private @function Normalize an event type/name to lowercase */
+let normalizeEventType = memoize((type: string) => type.toLowerCase())
 
 /** @private Get a node's attributes as a hashmap, regardless of type. */
 function getNodeAttributes(node: VNode) {
@@ -524,58 +734,21 @@ function getAttributesAsObject(list: NamedNodeMap): { [key: string]: string } {
   return attrs
 }
 
-/** @private Get the value of a rendered attribute */
-function getAccessor(node: HTMLElement, name: string, value: string) {
-  if (name === 'class') return node.className
-  if (name === 'style') return node.style.cssText
-  return value
-}
-
-/** @private Set a named attribute on the given Node, with special behavior for some names and event handlers.
- *	If `value` is `null`, the attribute/handler will be removed.
+/**
+* getNodeProps 是 preact 中的一个函数，用于从 VNode 中获取组件的 props 属性。
+它接受一个 vnode 参数，表示要获取 props 的 VNode 对象。它会将 vnode 的 attributes 属性浅拷贝到一个新的对象中，并将 children 和 text 属性分别赋值给 props 对象的 children 和 _content 属性。最后返回这个新的 props 对象。
  */
-function setAccessor(node: HTMLElement, name: string, value: string, old: any) {
-  if (name === 'class') {
-    node.className = value
-  } else if (name === 'style') {
-    node.style.cssText = value
-  } else {
-    setComplexAccessor(node, name, value, old)
+/** @private Reconstruct `props` from a VNode */
+function getNodeProps(vnode: VNode) {
+  let props = extend({}, vnode.attributes)
+  if (vnode.children) {
+    props.children = vnode.children
   }
-}
-/** @private For props without explicit behavior, apply to a Node as event handlers or attributes. */
-function setComplexAccessor(
-  node: HTMLElement,
-  name: string,
-  value: string,
-  old: any
-) {
-  if (name.substring(0, 2) === 'on') {
-    let type = name.substring(2).toLowerCase()
-    let l = node._listeners || (node._listeners = {})
-
-    if (!l[type]) node.addEventListener(type, eventProxy)
-    l[type] = value
-    return
+  if (vnode.text) {
+    props._content = vnode.text
   }
-
-  let type = typeof value
-  if (value === null) {
-    node.removeAttribute(name)
-  } else if (type !== 'function' && type !== 'object') {
-    node.setAttribute(name, value)
-  }
+  return props
 }
-
-function eventProxy(e: Event) {
-  console.log('eventProxy', e, this, this._listeners)
-  let l = this._listeners
-  let fn = l[normalizeEventType(e.type)]
-  if (fn) return fn.call(this, hook(hooks, 'event', e) || e)
-}
-
-/** @private @function Normalize an event type/name to lowercase */
-let normalizeEventType = memoize((type: string) => type.toLowerCase())
 
 /** @private Convert a hashmap of styles to CSSText */
 function styleObjToCss(s: { [key: string]: any }): string {
@@ -624,6 +797,15 @@ function hashToClassName(c: { [key: string]: any }): string {
 
 /** @private @function Convert a JavaScript camel-case CSS property name to a CSS property name */
 let jsToCss = memoize((s: string) => s.replace(/([A-Z])/, '-$1').toLowerCase())
+
+/** @private Copy own-properties from `props` onto `obj`. Returns `obj`. */
+function extend(obj: Record<string, any>, props: Record<string, any>) {
+  for (let i in props)
+    if (props.hasOwnProperty(i)) {
+      obj[i] = props[i]
+    }
+  return obj
+}
 
 export { options, hooks, rerender }
 export default { options, hooks, render, rerender, h, Component }

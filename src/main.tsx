@@ -61,7 +61,16 @@ const rootElement = document.getElementById('root')
 // 定义一个组件
 class HelloWorld extends preact.Component {
   render() {
-    return preact.h('h1', null, 'Hello, World!')
+    return preact.h(
+      'h1',
+      {
+        'data-test': 'test',
+        style: {
+          color: 'red',
+        },
+      },
+      'Hello, World!'
+    )
   }
 }
 
