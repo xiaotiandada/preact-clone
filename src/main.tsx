@@ -58,9 +58,47 @@ const rootElement = document.getElementById('root')
 //   document.getElementById('root')
 // )
 
+let togger = true
+
 // 定义一个组件
 class HelloWorld extends preact.Component {
-  render() {
+  getDefaultProps() {
+    return {
+      propsValue: 'hello world',
+    }
+  }
+
+  getInitialState() {
+    return {
+      stateValue: 'hello world',
+    }
+  }
+
+  initialize() {
+    console.log('initialize Component')
+  }
+
+  componentWillReceiveProps() {
+    console.log('componentWillReceiveProps')
+  }
+
+  componentWillUpdate() {
+    console.log('componentWillUpdate')
+  }
+
+  componentDidUpdate() {
+    console.log('componentDidUpdate')
+  }
+
+  componentWillUnmount() {
+    console.log('componentWillUnmount')
+  }
+
+  componentDidUnmount() {
+    console.log('componentDidUnmount')
+  }
+
+  render(props, state) {
     return preact.h(
       'h1',
       {
@@ -68,14 +106,80 @@ class HelloWorld extends preact.Component {
         style: {
           color: 'red',
         },
+        onClick: () => {
+          togger = !togger
+          console.log('togger clicked', togger, this)
+          this.setState({
+            stateValue: '1',
+          })
+        },
       },
-      'Hello, World!'
+      state?.stateValue
+    )
+  }
+}
+
+class Counter extends preact.Component {
+  getDefaultProps() {
+    return {}
+  }
+
+  getInitialState() {
+    return {
+      count: 0,
+    }
+  }
+
+  render(props, state) {
+    return preact.h(
+      'div',
+      {
+        style: {
+          fontSize: '20px',
+        },
+      },
+      preact.h('div', null, state.count),
+      preact.h(
+        'button',
+        {
+          onClick: () => {
+            this.setState({
+              count: state.count + 1,
+            })
+          },
+        },
+        'Increase'
+      ),
+      preact.h(
+        'button',
+        {
+          onClick: () => {
+            this.setState({
+              count: state.count - 1,
+            })
+          },
+        },
+        'Decrease'
+      ),
+      preact.h(
+        'button',
+        {
+          onClick: () => {
+            this.setState({
+              count: 0,
+            })
+          },
+        },
+        'Reset'
+      ),
+      preact.h(HelloWorld)
     )
   }
 }
 
 // 渲染组件到DOM中
-preact.render(preact.h(HelloWorld), rootElement!)
+// preact.render(preact.h(HelloWorld), rootElement!)
+preact.render(preact.h(Counter), rootElement!)
 
 // 渲染组件到DOM中
 // preact.render(
