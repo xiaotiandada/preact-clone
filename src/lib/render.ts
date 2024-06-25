@@ -1,3 +1,5 @@
+import { Fragment, createElement } from "./create-element";
+
 /**
  * Render a Preact virtual node into a DOM element
  * @param {ComponentChild} vnode The virtual node to render
@@ -6,5 +8,8 @@
  * existing DOM tree rooted at `replaceNode`
  */
 export function render(vnode, parentDom, replaceNode) {
-	
+	vnode = ((replaceNode) || parentDom)._children =
+		createElement(Fragment, null, [vnode]);
+
+  console.log('vnode', vnode)
 }
