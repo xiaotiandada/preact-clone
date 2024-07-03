@@ -57,6 +57,9 @@ export function initMixin(Vue: typeof Component) {
     } else {
       vm._renderProxy = vm
     }
+
+    // Vue 初始化主要就干了几件事情，合并配置，初始化生命周期，初始化事件中心，初始化渲染，初始化 data、props、computed、watcher 等等。
+    
     // expose real self
     vm._self = vm
     initLifecycle(vm)
@@ -75,6 +78,7 @@ export function initMixin(Vue: typeof Component) {
       measure(`vue ${vm._name} init`, startTag, endTag)
     }
 
+    // 如果有 el 属性，则调用 vm.$mount 方法挂载 vm，挂载的目标就是把模板渲染成最终的 DOM，
     if (vm.$options.el) {
       vm.$mount(vm.$options.el)
     }

@@ -17,6 +17,21 @@ import {
 } from '../util/index'
 import type { GlobalAPI } from 'types/global-api'
 
+
+
+// 该函数用于初始化全局API，接收一个GlobalAPI类型的Vue对象作为参数。主要功能包括：
+
+// 配置Vue.config对象，通过Object.defineProperty定义getter和setter，其中setter在开发环境下会给出警告，不推荐替换Vue.config对象，而是设置其个别字段。
+
+// 暴露一些实用方法，如Vue.util.warn、Vue.util.extend等，这些方法不是公共API的一部分，使用时需谨慎。
+
+// 定义Vue.set、Vue.delete和Vue.nextTick方法，用于响应式地修改数据和延迟执行回调。
+
+// 提供Vue.observable方法，用于创建可观察对象。
+
+// 初始化Vue.options对象，包括组件、指令、过滤器等的选项，并设置_base属性指向Vue自身，用于Weex的多实例场景。
+
+// 调用initUse、initMixin、initExtend和initAssetRegisters函数，进一步初始化Vue的各种特性。
 export function initGlobalAPI(Vue: GlobalAPI) {
   // config
   const configDef: Record<string, any> = {}
